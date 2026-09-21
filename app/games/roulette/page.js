@@ -5,37 +5,50 @@ import { loadState, saveState, addHistory } from "../../../lib/store";
 import { playRoulette } from "../../../lib/games";
 
 export default function Roulette() {
-  const [state, setState] = useState(null);
-  const [bet, setBet] = useState(50);
+  const [state, setState] = useState({ balance: 0 });
+  const [bet, setBet] = useState(25000);
   const [pick, setPick] = useState("red");
+  const [spinning, setSpinning] = useState(false);
   const [res, setRes] = useState(null);
   useEffect(() => setState(loadState()), []);
-  if (!state) return <div className="wrap"><Link href="/">Sign in</Link></div>;
-
   function go() {
     const b = Math.max(1, Number(bet) || 0);
-    if (state.balance < b) return alert("Not enough chips.");
-    const r = playRoulette(b, pick);
-    const next = { ...state, balance: state.balance - b + r.win };
-    addHistory(next, { type: "roulette", bet: b, win: r.win, note: `${r.n} ${r.color}` });
-    saveState(next);
-    setState({ ...next });
-    setRes(r);
+    if (spinning) return;
+    if (state.balance < b) return alert("Need more chips. Dev menu on the floor.");
+    setSpinning(true);
+    setRes(null);
+    setTimeout(() => {
+      const rr = playRoulette(b, pick);
+      const bank = loadState();
+      const next = { ...bank, balance: bank.balance - b + rr.win };
+      addHistory(next, { type: "roulette", bet: b, win: rr.win, note: rr.n + " " + rr.color });
+      saveState(next);
+      setState({ ...next });
+      setRes(rr);
+      setSpinning(false);
+    }, 2400);
   }
-
   return (
     <div className="wrap">
-      <div className="nav"><Link href="/" className="brand">← Floor</Link><div className="bal">{state.balance.toLocaleString()} chips</div></div>
-      <div className="card">
+      <div className="nav">
+        <Link href="/" className="brand">← Floor</Link>
+        <div className="bal">{Number(state.balance).toLocaleString()}</div>
+      </div>
+      <div className="table">
         <h2>Roulette</h2>
-        <select value={pick} onChange={(e) => setPick(e.target.value)}>
-          <option value="red">Red (2x)</option>
-          <option value="black">Black (2x)</option>
-          <option value="green">Green 0 (14x)</option>
-        </select>
+        <div className="wheel-wrap">
+          <div className="pointer" />
+          <div className={"wheel" + (spinning ? " spin" : "")} />
+        </div>
+        <div className="row">
+          <button className="btn ghost" onClick={() => setPick("red")}>Red</button>
+          <button className="btn ghost" onClick={() => setPick("black")}>Black</button>
+          <button className="btn ghost" onClick={() => setPick("green")}>Green 0</button>
+        </div>
+        <p className="muted">On: {pick}</p>
         <input type="number" value={bet} onChange={(e) => setBet(e.target.value)} />
-        <button className="btn" onClick={go}>Spin wheel</button>
-        {res && <p>Ball: {res.n} {res.color}. {res.win > 0 ? `Won ${res.win}` : "Lost"}</p>}
+        <button className="btn" onClick={go} disabled={spinning}>{spinning ? "Spinning..." : "Spin"}</button>
+        {res && <p>Ball {res.n} {res.color}. {res.win ? "Won " + res.win.toLocaleString() : "Lost"}</p>}
       </div>
     </div>
   );
